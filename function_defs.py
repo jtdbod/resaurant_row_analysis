@@ -248,7 +248,8 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
                 extent = [min(t), max(t), 0, 1]
                 if plot_flag == 'heatmap':
                     axes[ax_index[rr - 1]].imshow(traces, extent=extent)
-                # axes[ax_index[rr-1]].plot(traces.T)
+                if plot_flag == 'all':
+                    axes[ax_index[rr-1]].plot(t,traces.T)
                 if plot_flag == 'mean':
                     axes[ax_index[rr - 1]].plot(t, mean_trace,
                                                 label=str(prob) + '% tone')
@@ -256,11 +257,8 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
                                                         mean_trace - sem_trace, alpha=0.5)
                     axes[ax_index[rr - 1]].set_xlabel('Time (s)')
                     axes[ax_index[rr - 1]].set_ylabel('FL Signal (a.u)')
-                    # axes[ax_index[rr-1]].title(alignment + ' ' + sg + ', R'+str(rr))
                     axes[ax_index[rr - 1]].set_title('R' + str(rr))
                     axes[ax_index[rr - 1]].legend()
-                    # axes[ax_index[rr-1]].set_ylim([-.00004,.00005])
-                    # axes[ax_index[rr-1]].set_ylim(ymin,ymax)
             ymin, ymax = axes[ax_index[rr - 1]].get_ylim()
             axes[ax_index[rr - 1]].plot([0, 0], [ymin, ymax], '--k')
 
@@ -276,7 +274,7 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
             # Filter for events that match condition: 'reject', 'rewarded', 'quit'
             if np.sum(event_idx) > 0:
                 for event in event_idx:
-                    if (data_rr.event_class[event] == condition):
+                    if data_rr.event_class[event] == condition:
                         condition_matched = np.append(condition_matched, event)
             event_idx = condition_matched
             event_ts = data_rr.time[event_idx].values
@@ -284,7 +282,7 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
         for prob in [0, 20, 80, 100]:
             if len(event_ts) < 1:
                 print(
-                    f"Restaurant {rr} has no traces for probability tone {prob}")
+                    f"No events for probability tone {prob}")
                 continue
             # traces = np.zeros([len(event_ts), time_window*2])
             if prob == 0:
@@ -297,10 +295,6 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
                     ts_rr = event_ts[i]
                     # Index of timestamp that coincides with event timestamp
                     ts_fp = np.argmax(signal_fp_ts > ts_rr)
-                    # print('---')
-                    # print('Event timestamp: '+str(ts_rr))
-                    # print('FP aligned timestamp: '+ str(signal_fp_ts[ts_fp]))
-                    # print('Difference: '+str(signal_fp_ts[ts_fp]-ts_rr))
                     if (ts_fp > time_window) & ((ts_fp + time_window) < len(signal_fp)):
                         # trace = signal_fp[ts_fp-time_window:ts_fp+time_window]
                         # traces = np.vstack([traces, trace-trace[0]])
@@ -328,11 +322,7 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
                                   mean_trace - sem_trace, alpha=0.5)
                 axes.set_xlabel('Time (s)')
                 axes.set_ylabel('FL Signal (a.u)')
-                # axes[ax_index[rr-1]].title(alignment + ' ' + sg + ', R'+str(rr))
-                # axes.set_title('R'+str(rr))
                 axes.legend()
-                # axes[ax_index[rr-1]].set_ylim([-.00004,.00005])
-                # axes[ax_index[rr-1]].set_ylim(ymin,ymax)
         ymin, ymax = axes.get_ylim()
         axes.plot([0, 0], [ymin, ymax], '--k')
 
@@ -412,11 +402,6 @@ def classify_events(df):
                 next_exit_idx = min(exit_idx[exit_idx > event])
                 next_pellet_reveal_idx = min(
                     servo_open_idx[servo_open_idx > event])
-                # print('Tone: '+ str(event))
-                # print('Entry: '+str(next_entry_idx))
-                # print('Accept: '+str(next_accept_idx))
-                # print('Pellet taken: '+str(next_pellet_reveal_idx))
-                # print('Exit: '+str(next_exit_idx))
                 # Reject Events
                 if next_exit_idx < next_accept_idx:
                     # print('Reject')
@@ -494,10 +479,5 @@ def baseline_trace(trace):
         trace, 1 + int(3 / frame_interval))  # 3 second long kernel
     trace_backsub = trace - med_filt
     std_trace = np.zeros_like(trace)
-    # for i in np.arange(0, len(trace)-int(3/frame_interval)):
-    #    std_trace[i] = np.std(trace_backsub[i:i+int(3/frame_interval)])
-    # fill zero end pads
-    # std_trace[std_trace == 0] = np.mean(std_trace)
-    # zscore_trace = trace_backsub/std_trace
     zscore_trace = trace_backsub / (np.std(trace_backsub))
     return zscore_trace
