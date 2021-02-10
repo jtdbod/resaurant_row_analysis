@@ -122,11 +122,11 @@ def get_fp_plots(animal, day, alignment, sg, side, condition, split=False, plot_
     '''
 
     # condition can be "reject","rewarded" or "quit"
-    plot_trace_probs(alignment, sg, side, condition, data_fp,
+    plot_fp_data(alignment, sg, side, condition, data_fp,
                      data_rr, split, plot_flag)
 
 
-def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, plot_flag):
+def plot_fp_data(alignment, sg, side, condition, data_fp, data_rr, split, plot_flag):
     events = {
         'reward': [16, 28, 40, 52],
         # Servo arm open (should track with pellet taken fro dispenser)
@@ -142,12 +142,7 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
         'entry': [61, 64, 67, 70],
         'accept': [62, 65, 68, 71]
     }
-    if alignment == 'reject':
-        [num_rejects, num_no_reward_tones,
-         reject_ts] = count_rejections(data_rr)
-        event_ts = reject_ts
-    else:
-        event_codes = events.get(alignment)
+    event_codes = events.get(alignment)
 
     if side == 'left':
         if sg == 'green':
@@ -191,9 +186,10 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
 
     # Calculate time window for plotting FP data
     WINDOW_S = 3  # number of seconds before and after event to plot FP data
-    frame_interval = np.nanmean(np.diff(signal_fp_ts)) / 1000
+    frame_interval = np.nanmedian(np.diff(signal_fp_ts[0:100])) / 1000
     # Time window in units of "frames"
     time_window = int(WINDOW_S / frame_interval)
+    # Choose to divide plots by restaurant
     if split == True:
         fig, axes = plt.subplots(2, 2)
         ax_index = [(0, 0), (0, 1), (1, 0), (1, 1)]
@@ -261,33 +257,34 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
                     axes[ax_index[rr - 1]].legend()
             ymin, ymax = axes[ax_index[rr - 1]].get_ylim()
             axes[ax_index[rr - 1]].plot([0, 0], [ymin, ymax], '--k')
-
+    # Combine data from all restaurants
     else:
         fig, axes = plt.subplots()
-        if alignment != 'reject':
-            event_idx = np.empty([0, 1])
-            for code in np.arange(len(event_codes)):
-                event_code = event_codes[code]
-                event_idx = np.append(event_idx, data_rr.b_code[data_rr.b_code ==
-                                                                event_code].index.tolist())
-            condition_matched = np.array([])
-            # Filter for events that match condition: 'reject', 'rewarded', 'quit'
+        event_idx = np.empty([0, 1])
+        for code in np.arange(len(event_codes)):
+            event_code = event_codes[code]
+            event_idx = np.append(event_idx, data_rr.b_code[data_rr.b_code ==
+                                                            event_code].index.tolist())
+        condition_matched = np.array([])
+        # Filter for events that match condition: 'reject', 'rewarded', 'quit', 'any'
+        if condition != 'any':
             if np.sum(event_idx) > 0:
                 for event in event_idx:
                     if data_rr.event_class[event] == condition:
                         condition_matched = np.append(condition_matched, event)
             event_idx = condition_matched
-            event_ts = data_rr.time[event_idx].values
+        event_ts = data_rr.time[event_idx].values
         c = 0
+        event_counts = []
         for prob in [0, 20, 80, 100]:
+            event_count = 0
             if len(event_ts) < 1:
                 print(
                     f"No events for probability tone {prob}")
                 continue
-            # traces = np.zeros([len(event_ts), time_window*2])
             if prob == 0:
                 traces = np.zeros([0, time_window * 2])
-            elif plot_flag != 'heatmap':
+            elif plot_flag != 'heatmap': #Prevent overwriting of heatmap for each prob
                 traces = np.zeros([0, time_window * 2])
             for i in np.arange(0, len(event_ts), 1):
                 if data_rr.offer_tone[event_idx[i]] == prob:
@@ -300,6 +297,8 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
                         # traces = np.vstack([traces, trace-trace[0]])
                         trace = signal_fp[ts_fp - time_window:ts_fp + time_window]
                         traces = np.vstack([traces, trace])
+                        event_count += 1
+            event_counts = np.append(event_counts, event_count)
             t = np.arange(-time_window, time_window, 1) * frame_interval
             if np.shape(traces)[0] < 1:
                 # Create zero trace if no events occur
@@ -327,6 +326,10 @@ def plot_trace_probs(alignment, sg, side, condition, data_fp, data_rr, split, pl
         axes.plot([0, 0], [ymin, ymax], '--k')
 
         fig_title = alignment + ' ' + side + ' ' + sg + ' ' + condition
+        fig_title = f"Alignment: {alignment}, Hemi: {side}, Signal: {sg}, Condition: {condition}. \n Event Counts: P0: {event_counts[0]:.0f}, " \
+                    f"P20: {event_counts[1]:.0f},  " \
+                    f"P80: {event_counts[2]:.0f}, " \
+                    f"P100: {event_counts[3]:.0f}"
         plt.suptitle(fig_title)
         plt.tight_layout()
 
